@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useDebounce from "../../utils/useDebounce";
 import { useIndexedDB } from "react-indexed-db-hook";
+import ArtistItem from "./components/ArtistItem";
 
-interface ResponseArtistModel {
+export interface ResponseArtistModel {
     api_link: string,
     api_model: string,
     id: number,
@@ -12,37 +13,45 @@ interface ResponseArtistModel {
     _score: number
 }
 
-// /search?q={searchTerm}
-const Search = () => {
-    const { add, getAll, getByIndex, deleteRecord } = useIndexedDB('artist');
-    const [searchValue, setSearchValue] = useState('');
-    const [selectedArtists, setSelectedArtists] = useState<number[]>([])
+export interface ArtistModel {
+    id: number;
+    title: string
+}
 
-    const searchDebounced = useDebounce(searchValue)
+const Search = () => {
+    const { getAll, clear } = useIndexedDB('artist');
+
+    const [searchValue, setSearchValue] = useState('');
+    const [selectedArtists, setSelectedArtists] = useState<ArtistModel[]>([])
+    const [showOnlySelectedItems, setShowOnlySelectedItems] = useState(false);
+
+    const searchDebounced = useDebounce(searchValue, 200)
     const { data: results } = useQuery<{ data: ResponseArtistModel[] }>({
         queryKey: ['getArtistes', searchDebounced],
         queryFn: async () => {
-            return await fetch(`https://api.artic.edu/api/v1/artists/search?q=${searchDebounced}`, {
+            const res = await fetch(`https://api.artic.edu/api/v1/artists/search?q=${searchDebounced}`, {
                 method: 'GET',
                 headers: {
                     "Content-Type": "application/json",
                 },
             })
-                // Create an object URL for the response
-                .then((response) => response.json())
+
+            return res.json()
         },
         initialData: { data: [] },
-        enabled: searchDebounced.length > 0
+        enabled: searchDebounced.length > 0,
     })
+    const resultToDisplay = useMemo(() => {
+        return showOnlySelectedItems ? selectedArtists : results.data.map(item => ({ ...item } as ArtistModel))
+    }, [showOnlySelectedItems, selectedArtists, results])
 
-    const handleAddArtist = async (artistToAdd: ResponseArtistModel) => {
-        const artistinIndexDb = await getByIndex("artistId", artistToAdd.id)
-        if (artistinIndexDb) {
-            deleteRecord(artistinIndexDb.id)
-        } else {
-            add({ title: artistToAdd.title, artistId: artistToAdd.id })
-        }
+    const refreshSelectedArtist = () => {
+        getAll().then((artistsFromDB: (ArtistModel & { artistId: number })[]) => setSelectedArtists(artistsFromDB.map(art => ({ id: art.artistId, title: art.title }))))
     }
+
+    useEffect(() => {
+        refreshSelectedArtist()
+    }, [])
 
     return <div style={{
         display: 'flex',
@@ -54,11 +63,36 @@ const Search = () => {
         <div style={{
             display: 'flex',
             flexDirection: 'column',
+            rowGap: '8px'
         }}>
-            <input className="searchInput" type="text" value={searchValue} onChange={(e) => setSearchValue(e.target.value)} placeholder="Type an artist name" />
-            <span style={{
-                textAlign: 'start'
-            }}>0 selected</span>
+            <input className="searchInput" type="text" value={searchValue} onChange={(e) => {
+                setSearchValue(e.target.value)
+                if (showOnlySelectedItems) {
+                    setShowOnlySelectedItems(false)
+                }
+
+            }} placeholder="Search an artist name..." />
+            <div style={{
+                display: 'flex',
+                flexDirection: 'row',
+                justifyContent: 'space-between'
+            }}>
+                {
+                    selectedArtists.length > 0 ? <><span className='actionText actionTextSelectedItem' style={{
+                        textAlign: 'start'
+                    }} onClick={() => { setShowOnlySelectedItems(true); setSearchValue('') }}>
+                        Show selected items ({selectedArtists.length})</span>
+                        <span className="actionText actionTextSelectedItem" onClick={() => {
+                            clear();
+                            refreshSelectedArtist()
+                        }}>Reset</span>
+                    </> : <span className='actionText' style={{
+                        textAlign: 'start'
+                    }}>
+                        {selectedArtists.length} selected</span>
+                }
+
+            </div>
         </div>
         <div style={{
             display: 'flex',
@@ -66,8 +100,8 @@ const Search = () => {
             rowGap: '8px'
         }}>
 
-            {results.data.map(artist => {
-                return <span key={artist.id} className="artist" onClick={() => handleAddArtist(artist)}>{artist.title}</span>
+            {resultToDisplay.map(artist => {
+                return <ArtistItem key={artist.id} artist={artist} refreshSelectedArtist={refreshSelectedArtist} isSelected={selectedArtists.findIndex(a => a.id === artist.id) > -1} />
             })}
         </div>
     </div>

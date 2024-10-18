@@ -37,6 +37,22 @@
   color: white;
 }
 
+.actionText {
+  font-size: 14px;
+  color: #a2a6ab;
+  font-weight: 500;
+}
+
+.actionTextSelectedItem {
+  color: #246cd6;
+}
+
+.actionTextSelectedItem:hover {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+
 .searchInput {
   width: '100%';
   padding: 8px;
