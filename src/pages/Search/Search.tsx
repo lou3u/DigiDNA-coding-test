@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useDebounce from "../../utils/useDebounce";
 import { useIndexedDB } from "react-indexed-db-hook";
 import ArtistItem from "./components/ArtistItem";
@@ -21,6 +21,8 @@ export interface ArtistModel {
 const Search = () => {
     const { getAll, clear } = useIndexedDB('artist');
 
+    const searchBarRef = useRef<HTMLInputElement>(null);
+
     const [searchValue, setSearchValue] = useState('');
     const [selectedArtists, setSelectedArtists] = useState<ArtistModel[]>([])
     const [showOnlySelectedItems, setShowOnlySelectedItems] = useState(false);
@@ -31,9 +33,6 @@ const Search = () => {
         queryFn: async () => {
             const res = await fetch(`https://api.artic.edu/api/v1/artists/search?q=${searchDebounced}`, {
                 method: 'GET',
-                headers: {
-                    "Content-Type": "application/json",
-                },
             })
 
             return res.json()
@@ -47,6 +46,13 @@ const Search = () => {
 
     const refreshSelectedArtist = () => {
         getAll().then((artistsFromDB: (ArtistModel & { artistId: number })[]) => setSelectedArtists(artistsFromDB.map(art => ({ id: art.artistId, title: art.title }))))
+    }
+
+    const handleReset = () => {
+        clear();
+        refreshSelectedArtist();
+        setSearchValue('');
+        searchBarRef && searchBarRef.current && searchBarRef.current.focus()
     }
 
     useEffect(() => {
@@ -65,7 +71,7 @@ const Search = () => {
             flexDirection: 'column',
             rowGap: '8px'
         }}>
-            <input className="searchInput" type="text" value={searchValue} onChange={(e) => {
+            <input ref={searchBarRef} className="searchInput" type="text" value={searchValue} onChange={(e) => {
                 setSearchValue(e.target.value)
                 if (showOnlySelectedItems) {
                     setShowOnlySelectedItems(false)
@@ -80,12 +86,9 @@ const Search = () => {
                 {
                     selectedArtists.length > 0 ? <><span className='actionText actionTextSelectedItem' style={{
                         textAlign: 'start'
-                    }} onClick={() => { setShowOnlySelectedItems(true); setSearchValue('') }}>
+                    }} onClick={() => { setShowOnlySelectedItems(true); setSearchValue(''); }}>
                         Show selected items ({selectedArtists.length})</span>
-                        <span className="actionText actionTextSelectedItem" onClick={() => {
-                            clear();
-                            refreshSelectedArtist()
-                        }}>Reset</span>
+                        <span className="actionText actionTextSelectedItem" onClick={handleReset}>Reset</span>
                     </> : <span className='actionText' style={{
                         textAlign: 'start'
                     }}>

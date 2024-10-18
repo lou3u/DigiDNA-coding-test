@@ -26,7 +26,9 @@ const ArtistItem = ({ artist, refreshSelectedArtist, isSelected }: Props) => {
         flexDirection: 'row',
         columnGap: '8px'
     }} onClick={() => handleAddArtist(artist)}>
-        <input type="checkbox" checked={isSelected} onChange={(e) => { e.preventDefault(); e.stopPropagation() }}></input>
+        <input type="checkbox" style={{
+            cursor: 'pointer'
+        }} checked={isSelected} onChange={(e) => { e.preventDefault(); e.stopPropagation() }}></input>
         <span >{artist.title}</span>
     </div>
 }
